@@ -1,0 +1,39 @@
+name: Update Google News JSON
+
+on:
+  schedule:
+    - cron: "0 21 * * *"      # JST 6:00（毎日）
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout updater repo
+        uses: actions/checkout@v3
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Fetch Google News RSS JSON
+        run: |
+          curl -L "https://api.rss2json.com/v1/api.json?rss_url=https://news.google.com/rss?hl=ja&gl=JP&ceid=JP:ja" \
+            -o news_raw.json
+
+      - name: Build simplified news.json
+        run: |
+          echo '{"items":' > news.json
+          jq '.items' news_raw.json >> news.json
+          echo '}' >> news.json
+
+      - name: Push to nedokoya-news repo
+        run: |
+          git clone https://github.com/heeco765/nedokoya-news.git out
+          cp news.json out/news.json
+          cd out
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add news.json
+          git commit -m "Auto-update news.json" || echo "No changes"
+          git push https://$GH_PAT@github.com/heeco765/nedokoya-news.git
